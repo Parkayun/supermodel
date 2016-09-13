@@ -1,3 +1,5 @@
+import json
+
 import requests
 
 from django.db import models
@@ -12,13 +14,18 @@ class RemoteManager(Manager):
             setattr(obj, key, value)
         return obj
 
-    def __request(self, parameters):
-        url = self.model.host
-        return requests.post(url, data=parameters).json()
+    def __request(self, parameters, method):
+        url = self.model.__host__
+        headers = {
+            'X-MODEL': self.model._meta.object_name,
+            'X-METHOD': method
+        }
+        return json.loads(requests.post(url, headers=headers, data=parameters).content.decode('utf-8'))
 
-    def _get_data(self, parameters=None):
+    def _get_data(self, parameters=None, method=None):
         parameters = parameters if isinstance(parameters, dict) else {}
-        data = self.__request(parameters)
+        method = method if isinstance(method, str) and method in ('all', 'filter', 'get') else 'all'
+        data = self.__request(parameters, method)
         results = None
 
         if isinstance(data, list):
@@ -32,13 +39,13 @@ class RemoteManager(Manager):
         return results
 
     def all(self):
-        return self._get_data()
+        return self._get_data(method="all")
 
     def filter(self, *args, **kwargs):
-        pass
+        return self._get_data(kwargs, method="filter")
 
     def get(self, *args, **kwargs):
-        pass
+        return self._get_data(kwargs, method="get")
 
 
 class RemoteModel(models.Model):
